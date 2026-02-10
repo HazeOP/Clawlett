@@ -1,5 +1,9 @@
 # Clawlett
 
+<p align="center">
+  <img src="assets/mascot.png" alt="Clawlett Mascot">
+</p>
+
 An [OpenClaw](https://openclaw.ai) skill for autonomous token swaps on Base via Aerodrome, powered by Gnosis Safe + Zodiac Roles.
 
 ## Overview
