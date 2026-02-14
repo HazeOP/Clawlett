@@ -111,7 +111,7 @@ node clawlett/scripts/trenches.js sell --token MTK --amount 1000
 node clawlett/scripts/trenches.js sell --token MTK --all
 
 # Token info
-node clawlett/scripts/trenches.js info BID
+node clawlett/scripts/trenches.js info MTK
 ```
 
 ### Token Discovery
@@ -184,7 +184,7 @@ Config is stored in `config/wallet.json` after initialization:
 | Safe Factory | `0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2` |
 | Roles Singleton | `0x9646fDAD06d3e24444381f44362a3B0eB343D337` |
 | Module Factory | `0x000000000000aDdB49795b0f9bA5BC298cDda236` |
-| AgentKeyFactoryV3 | `0x4Ab6F2AF2d06aeB1C953DeaDC9aF0E12E59244FC` |
+| AgentKeyFactoryV3 | `0x68035FbC9c47aCc89140705806E2C183F35B3A5a` |
 
 ## OpenClaw Integration
 

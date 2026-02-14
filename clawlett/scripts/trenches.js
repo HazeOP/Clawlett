@@ -45,7 +45,7 @@ const TRENCHES_API_URL = process.env.TRENCHES_API_URL || 'https://trenches.bid'
 const VERCEL_PROTECTION_BYPASS = process.env.VERCEL_PROTECTION_BYPASS || ''
 
 // Contracts
-const AGENT_KEY_FACTORY = '0x4Ab6F2AF2d06aeB1C953DeaDC9aF0E12E59244FC'
+const AGENT_KEY_FACTORY = '0x68035FbC9c47aCc89140705806E2C183F35B3A5a'
 const WETH_ADDRESS = '0x4200000000000000000000000000000000000006'
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
@@ -378,7 +378,7 @@ Usage: node trenches.js <subcommand> [options]
 Trenches token creation and bonding curve trading on Base.
 
 Subcommands:
-  create      Create a new token on Trenches
+  create      Create a new token on Trenches (0.005 ETH mint cost)
   buy         Buy tokens with ETH on bonding curve
   sell        Sell tokens for ETH on bonding curve
   info        Get token information
@@ -414,6 +414,9 @@ Use "node trenches.js <subcommand> --help" for subcommand-specific help.
 Usage: node trenches.js create --name <NAME> --symbol <SYMBOL> --description <DESC> [options]
 
 Create a new token on Trenches bonding curve.
+
+Mint cost: 0.005 ETH (paid to the factory contract on creation).
+If --initial-buy is specified, the total ETH required is 0.005 + initial buy amount.
 
 Arguments:
   --name            Token name (required)
@@ -469,7 +472,7 @@ Arguments:
   First positional arg or --token: Token symbol (required)
 
 Examples:
-  node trenches.js info BID
+  node trenches.js info MTK
   node trenches.js info --token MTK
 `)
             break

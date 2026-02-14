@@ -129,7 +129,7 @@ Buy 0.01 ETH worth of MTK on Trenches
 Sell all my MTK tokens
 What's trending on Trenches?
 Show me the top gainers
-Get info on BID token
+Get info on MTK token
 ```
 
 The agent will:
@@ -188,7 +188,7 @@ node scripts/trenches.js sell --token MTK --amount 1000
 node scripts/trenches.js sell --token MTK --all
 
 # Trenches: Token info and discovery
-node scripts/trenches.js info BID
+node scripts/trenches.js info MTK
 node scripts/trenches.js trending
 node scripts/trenches.js trending --window 1h --limit 5
 node scripts/trenches.js new
@@ -230,7 +230,7 @@ Scripts read from `config/wallet.json` (configured for Base Mainnet):
 | CoW Settlement | `0x9008D19f58AAbD9eD0D60971565AA8510560ab41` | CoW Protocol settlement |
 | CoW Vault Relayer | `0xC92E8bdf79f0507f65a392b0ab4667716BFE0110` | CoW token allowance target |
 | ZodiacHelpers | `0x9699a24346464F1810a2822CEEE89f715c65F629` | Approvals, CoW presign, WETH wrap/unwrap, Trenches factory wrappers via delegatecall |
-| AgentKeyFactoryV3 | `0x4Ab6F2AF2d06aeB1C953DeaDC9aF0E12E59244FC` | Trenches token creation and bonding curve trading |
+| AgentKeyFactoryV3 | `0x68035FbC9c47aCc89140705806E2C183F35B3A5a` | Trenches token creation and bonding curve trading |
 | Safe Factory | `0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2` | Safe deployer |
 | Roles Singleton | `0x9646fDAD06d3e24444381f44362a3B0eB343D337` | Zodiac Roles |
 | Module Factory | `0x000000000000aDdB49795b0f9bA5BC298cDda236` | Module deployer |
