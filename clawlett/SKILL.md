@@ -135,6 +135,23 @@ Show me the top gainers
 Get info on MTK token
 ```
 
+**IMPORTANT — Token creation parameter collection:**
+When a user asks to create a token, the agent MUST collect ALL of the following parameters before executing. If the user's request is missing any of these, ask them to provide the missing values. Do NOT use defaults silently — always confirm each parameter with the user.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| Name | **Yes** | The token name (e.g., "My Token") |
+| Symbol | **Yes** | The token ticker symbol (e.g., MTK) |
+| Description | **Yes** | A description of the token |
+| Image | No | Path to a token image file (PNG/JPEG/WEBP, max 1MB) |
+| Base token | No | `BID` (default) or `ETH` — which token to pair with |
+| Anti-bot protection | No | ON by default (10-minute sniper protection). Ask user if they want it enabled or disabled |
+| Initial buy | No | Amount of ETH to buy immediately after creation (only works with anti-bot OFF) |
+| Twitter | No | Twitter/X handle for the token |
+| Website | No | Website URL for the token |
+
+The agent should present the user with a summary of all parameters (including defaults) and ask for confirmation before executing the creation.
+
 **Token creation defaults:**
 - Base token: BID (use `--base-token ETH` for ETH pairing)
 - Anti-bot protection: ON (10-minute sniper protection window)
