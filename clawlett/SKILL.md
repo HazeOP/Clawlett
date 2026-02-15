@@ -36,9 +36,9 @@ This skill enables autonomous token swaps and Trenches token creation/trading th
 
 ## Agent Name (CNS)
 
-Each agent must register a **unique name** via the Clawlett Name Service (CNS). This name is the agent's app-wide identifier — no two agents can share the same name. The name is minted as an NFT on Base.
+Each agent can optionally register a **unique name** via the Clawlett Name Service (CNS). This name is the agent's app-wide identifier — no two agents can share the same name. The name is minted as an NFT on Base.
 
-Choose a name during initialization with `--name`. Once registered, it cannot be changed.
+Pass `--name` during initialization to register a CNS name. If omitted, CNS registration is skipped. Once registered, it cannot be changed.
 
 ## Token Safety
 
@@ -79,10 +79,10 @@ Tokens not in the verified list are searched via DexScreener (Base pairs). Searc
 
 ## Setup
 
-1. Owner provides their wallet address and chooses an **agent name**
+1. Owner provides their wallet address (and optionally an **agent name**)
 2. Agent generates keypair → **Owner sends 0.001 ETH on Base Mainnet** to agent for gas
 3. Agent deploys Safe on Base Mainnet (owner as sole owner)
-4. Agent registers with backend and mints CNS name on-chain
+4. Agent registers with backend and optionally mints CNS name on-chain (if `--name` provided)
 5. Agent deploys Zodiac Roles with swap permissions
 6. Agent removes itself as Safe owner (keeps Roles access)
 7. **Owner funds Safe on Base Mainnet** with tokens to trade
@@ -91,6 +91,7 @@ Tokens not in the verified list are searched via DexScreener (Base pairs). Searc
 
 ### Initialize
 ```
+Initialize my wallet with owner 0x123...
 Initialize my wallet with owner 0x123... and name MYAGENT
 ```
 
@@ -125,12 +126,27 @@ All on-chain operations go through ZodiacHelpers wrapper functions (`createViaFa
 
 ```
 Create a token called "My Token" with symbol MTK
+Create a token paired with BID (default base token)
+Create a token with anti-bot disabled and an initial buy
 Buy 0.01 ETH worth of MTK on Trenches
 Sell all my MTK tokens
 What's trending on Trenches?
 Show me the top gainers
 Get info on MTK token
 ```
+
+**Token creation defaults:**
+- Base token: BID (use `--base-token ETH` for ETH pairing)
+- Anti-bot protection: ON (10-minute sniper protection window)
+- Initial buy is blocked when anti-bot is enabled (agent can't buy during protection window)
+- Use `--no-antibot` to disable protection and allow initial buy
+- Use `--image` to attach a custom token image (PNG/JPEG/WEBP, max 1MB)
+
+**Anti-bot protection and buying:**
+- The agent cannot buy any token that has anti-bot protection currently active (within the 10-minute window after creation)
+- This applies to all tokens, not just ones the agent created
+- Both the client and backend enforce this — the backend will refuse to issue a swap signature for protected tokens
+- Wait for the protection window to expire before buying
 
 The agent will:
 1. Resolve the token symbol via Trenches API
@@ -163,7 +179,8 @@ The agent will:
 ### Examples
 
 ```bash
-# Initialize (name is unique, app-wide identifier)
+# Initialize (name is optional, registers on CNS if provided)
+node scripts/initialize.js --owner 0x123...
 node scripts/initialize.js --owner 0x123... --name MYAGENT
 
 # Check balance
@@ -178,9 +195,11 @@ node scripts/swap.js --from USDC --to DAI --amount 50 --execute --timeout 600
 # With custom slippage (0-0.5 range, e.g., 0.05 = 5%)
 node scripts/swap.js --from ETH --to USDC --amount 0.1 --slippage 0.03 --execute
 
-# Trenches: Create a token
+# Trenches: Create a token (BID base token by default, anti-bot ON)
 node scripts/trenches.js create --name "My Token" --symbol MTK --description "A cool token"
-node scripts/trenches.js create --name "My Token" --symbol MTK --description "desc" --initial-buy 0.01
+node scripts/trenches.js create --name "My Token" --symbol MTK --description "desc" --base-token ETH
+node scripts/trenches.js create --name "My Token" --symbol MTK --description "desc" --no-antibot --initial-buy 0.01
+node scripts/trenches.js create --name "My Token" --symbol MTK --description "desc" --image ./logo.png
 
 # Trenches: Buy/sell tokens
 node scripts/trenches.js buy --token MTK --amount 0.01

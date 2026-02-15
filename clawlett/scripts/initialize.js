@@ -173,11 +173,11 @@ function parseArgs() {
 
 function printHelp() {
     console.log(`
-Usage: node initialize.js --owner <OWNER_ADDRESS> --name <AGENT_NAME>
+Usage: node initialize.js --owner <OWNER_ADDRESS> [--name <AGENT_NAME>]
 
 Arguments:
   --owner, -o      Owner wallet address (will be sole Safe owner after setup)
-  --name, -n       Unique agent name for CNS (Clawlett Name Service)
+  --name, -n       Unique agent name for CNS (optional, registers on Clawlett Name Service)
   --config-dir, -c Config directory (default: ../config)
   --rpc, -r        RPC URL (default: ${DEFAULT_RPC_URL})
 
@@ -382,14 +382,14 @@ async function execSafeTransaction(safe, to, value, data, operation, signer) {
 async function main() {
     const args = parseArgs()
 
-    if (!args.owner || !args.name) {
-        console.error('Error: --owner and --name are required')
+    if (!args.owner) {
+        console.error('Error: --owner is required')
         printHelp()
         process.exit(1)
     }
 
     const owner = ethers.getAddress(args.owner)
-    const agentName = args.name.toUpperCase()
+    const agentName = args.name ? args.name.toUpperCase() : null
     const provider = new ethers.JsonRpcProvider(args.rpc)
 
     console.log('\n========================================')
@@ -652,7 +652,10 @@ async function main() {
 
     // Step 6: Register CNS name (via Safe — backend signs with account=safe)
     let cnsTokenId = state.cnsTokenId
-    if (!cnsTokenId) {
+    if (!agentName) {
+        console.log('\n--- Step 6: CNS Name ---')
+        console.log('   Skipped (--name not provided)')
+    } else if (!cnsTokenId) {
         console.log('\n--- Step 6: Register CNS Name ---')
         const cns = new ethers.Contract(CONTRACTS.CNS, CNS_ABI, provider)
 
@@ -868,7 +871,7 @@ async function main() {
         safe: safeAddress,
         roles: rolesAddress,
         roleKey: ROLE_KEY,
-        name: agentName,
+        name: agentName || null,
         cnsTokenId: cnsTokenId || null,
         erc8004AgentId: erc8004AgentId || null,
         contracts: CONTRACTS,

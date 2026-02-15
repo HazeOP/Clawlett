@@ -48,6 +48,7 @@ const VERCEL_PROTECTION_BYPASS = process.env.VERCEL_PROTECTION_BYPASS || ''
 const AGENT_KEY_FACTORY = '0x68035FbC9c47aCc89140705806E2C183F35B3A5a'
 const WETH_ADDRESS = '0x4200000000000000000000000000000000000006'
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+const BID_ADDRESS = '0xa1832f7F4e534aE557f9B5AB76dE54B1873e498B'
 
 // Uniswap V3 sqrt price limits
 const MIN_SQRT_PRICE = 4295128739n
@@ -210,7 +211,8 @@ async function createTokenApi(cookies, params) {
             website: params.website || '',
             initialBuyAmount: params.initialBuyAmount || '0',
             chainId: CHAIN_ID,
-            baseToken: ZERO_ADDRESS,
+            baseToken: params.baseToken || ZERO_ADDRESS,
+            isAntiSnipeEnabled: params.isAntiSnipeEnabled !== false,
         }),
     })
 
@@ -289,6 +291,9 @@ function parseArgs() {
         twitter: null,
         website: null,
         initialBuy: null,
+        baseToken: null,
+        noAntibot: false,
+        image: null,
         // buy/sell params
         token: null,
         amount: null,
@@ -325,6 +330,15 @@ function parseArgs() {
                 break
             case '--initial-buy':
                 result.initialBuy = args[++i]
+                break
+            case '--base-token':
+                result.baseToken = args[++i]
+                break
+            case '--no-antibot':
+                result.noAntibot = true
+                break
+            case '--image':
+                result.image = args[++i]
                 break
             case '--token':
             case '-t':
@@ -395,7 +409,8 @@ Common Options:
 
 Examples:
   node trenches.js create --name "My Token" --symbol MTK --description "A cool token"
-  node trenches.js create --name "My Token" --symbol MTK --description "desc" --initial-buy 0.01
+  node trenches.js create --name "My Token" --symbol MTK --description "desc" --base-token ETH
+  node trenches.js create --name "My Token" --symbol MTK --description "desc" --no-antibot --initial-buy 0.01
   node trenches.js buy --token MTK --amount 0.01
   node trenches.js sell --token MTK --amount 1000
   node trenches.js sell --token MTK --all
@@ -417,6 +432,7 @@ Create a new token on Trenches bonding curve.
 
 Mint cost: 0.005 ETH (paid to the factory contract on creation).
 If --initial-buy is specified, the total ETH required is 0.005 + initial buy amount.
+Note: --initial-buy cannot be used with anti-bot protection (enabled by default).
 
 Arguments:
   --name            Token name (required)
@@ -425,10 +441,15 @@ Arguments:
   --twitter         Twitter handle
   --website         Website URL
   --initial-buy     Initial buy amount in ETH (optional, e.g., 0.01)
+  --base-token      Base token for bonding curve: BID (default) or ETH
+  --no-antibot      Disable anti-bot/sniper protection (enabled by default)
+  --image           Path to token image file (PNG/JPEG/WEBP, max 1MB)
 
 Examples:
   node trenches.js create --name "My Token" --symbol MTK --description "A cool token"
-  node trenches.js create --name "My Token" --symbol MTK --description "desc" --initial-buy 0.01
+  node trenches.js create --name "My Token" --symbol MTK --description "desc" --base-token ETH
+  node trenches.js create --name "My Token" --symbol MTK --description "desc" --no-antibot --initial-buy 0.01
+  node trenches.js create --name "My Token" --symbol MTK --description "desc" --image ./logo.png
 `)
             break
         case 'buy':
@@ -505,12 +526,38 @@ async function handleCreate(args) {
         process.exit(1)
     }
 
+    // Anti-bot + initial buy conflict check
+    const isAntiSnipeEnabled = !args.noAntibot
+    if (isAntiSnipeEnabled && args.initialBuy) {
+        console.error('Error: Cannot do initial buy with anti-bot protection enabled.')
+        console.error('The agent cannot buy during the 10-minute protection window.')
+        console.error('Use --no-antibot to disable protection, or remove --initial-buy.')
+        process.exit(1)
+    }
+
+    // Resolve base token
+    let baseTokenAddress
+    if (!args.baseToken || args.baseToken.toUpperCase() === 'BID') {
+        baseTokenAddress = BID_ADDRESS
+        console.log(`\nBase token: BID (${BID_ADDRESS})`)
+    } else if (args.baseToken.toUpperCase() === 'ETH') {
+        baseTokenAddress = ZERO_ADDRESS
+        console.log(`\nBase token: ETH`)
+    } else if (args.baseToken.startsWith('0x') && args.baseToken.length === 42) {
+        baseTokenAddress = ethers.getAddress(args.baseToken)
+        console.log(`\nBase token: ${baseTokenAddress}`)
+    } else {
+        console.error(`Error: Invalid --base-token. Use BID, ETH, or a token address.`)
+        process.exit(1)
+    }
+
     const config = loadConfig(args.configDir)
     const { provider, wallet, roles, zodiacHelpersAddress } = loadAgentAndRoles(config, args.configDir, args.rpc)
     const safeAddress = config.safe
 
-    console.log(`\nSafe: ${safeAddress}`)
+    console.log(`Safe: ${safeAddress}`)
     console.log(`Creating token: ${args.name} (${args.symbol})`)
+    console.log(`Anti-bot protection: ${isAntiSnipeEnabled ? 'ON' : 'OFF'}`)
 
     // Read mintCost from factory
     const factory = new ethers.Contract(AGENT_KEY_FACTORY, FACTORY_READ_ABI, provider)
@@ -518,15 +565,36 @@ async function handleCreate(args) {
     console.log(`Mint cost: ${formatEth(mintCost)}`)
 
     const initialBuy = args.initialBuy ? ethers.parseEther(args.initialBuy) : 0n
-    const totalEthValue = mintCost + initialBuy
+    const isErc20Base = baseTokenAddress !== ZERO_ADDRESS
+
+    // When base token is ERC20 (e.g. BID), initial buy is in that token, not ETH
+    // ethValue only covers mint cost; the ERC20 is pulled via approval
+    const totalEthValue = isErc20Base ? mintCost : mintCost + initialBuy
 
     // Check Safe ETH balance
     const ethBalance = await provider.getBalance(safeAddress)
     console.log(`Safe ETH balance: ${formatEth(ethBalance)}`)
 
     if (ethBalance < totalEthValue) {
-        console.error(`\nInsufficient ETH. Need ${formatEth(totalEthValue)} (mint: ${formatEth(mintCost)} + initial buy: ${formatEth(initialBuy)})`)
+        const detail = isErc20Base
+            ? `Need ${formatEth(totalEthValue)} for mint cost`
+            : `Need ${formatEth(totalEthValue)} (mint: ${formatEth(mintCost)} + initial buy: ${formatEth(initialBuy)})`
+        console.error(`\nInsufficient ETH. ${detail}`)
         process.exit(1)
+    }
+
+    // Check ERC20 base token balance for initial buy
+    if (isErc20Base && initialBuy > 0n) {
+        const baseTokenContract = new ethers.Contract(baseTokenAddress, ERC20_ABI, provider)
+        const baseSymbol = await baseTokenContract.symbol()
+        const baseDecimals = Number(await baseTokenContract.decimals())
+        const baseBalance = await baseTokenContract.balanceOf(safeAddress)
+        console.log(`Safe ${baseSymbol} balance: ${formatAmount(baseBalance, baseDecimals, baseSymbol)}`)
+
+        if (baseBalance < initialBuy) {
+            console.error(`\nInsufficient ${baseSymbol}. Need ${formatAmount(initialBuy, baseDecimals, baseSymbol)} for initial buy, have ${formatAmount(baseBalance, baseDecimals, baseSymbol)}`)
+            process.exit(1)
+        }
     }
 
     // Get auth cookies
@@ -541,11 +609,40 @@ async function handleCreate(args) {
         twitter: args.twitter,
         website: args.website,
         initialBuyAmount: args.initialBuy || '0',
+        baseToken: baseTokenAddress,
+        isAntiSnipeEnabled,
     })
     console.log('Signature received.')
 
-    // Encode ZodiacHelpers.createViaFactory call
+    // Approve ERC20 base token for factory if needed (e.g. BID initial buy)
     const zodiacHelpers = new ethers.Interface(ZODIAC_HELPERS_ABI)
+
+    if (isErc20Base && initialBuy > 0n) {
+        console.log(`\nApproving ${formatEth(initialBuy)} of base token for factory...`)
+        const approveData = zodiacHelpers.encodeFunctionData('approveForFactory', [
+            AGENT_KEY_FACTORY,
+            baseTokenAddress,
+            initialBuy,
+        ])
+
+        const approveTx = await roles.execTransactionWithRole(
+            zodiacHelpersAddress,
+            0n,
+            approveData,
+            1, // delegatecall
+            config.roleKey,
+            true,
+        )
+        console.log(`   Transaction: ${approveTx.hash}`)
+        const approveReceipt = await approveTx.wait()
+        if (approveReceipt.status !== 1) {
+            console.error('Approval transaction failed!')
+            process.exit(1)
+        }
+        console.log('   Approved!')
+    }
+
+    // Encode ZodiacHelpers.createViaFactory call
     const encodedData = zodiacHelpers.encodeFunctionData('createViaFactory', [
         AGENT_KEY_FACTORY,
         {
@@ -597,6 +694,51 @@ async function handleCreate(args) {
     console.log(`   Name: ${args.name}`)
     console.log(`   Symbol: ${args.symbol}`)
     console.log(`   Tx: ${receipt.hash}`)
+
+    // Upload image if provided
+    if (args.image && apiResponse.tokenId) {
+        console.log(`\nUploading image: ${args.image}`)
+        try {
+            const imagePath = path.resolve(args.image)
+            if (!fs.existsSync(imagePath)) {
+                throw new Error(`Image file not found: ${imagePath}`)
+            }
+
+            const stat = fs.statSync(imagePath)
+            if (stat.size > 1_000_000) {
+                throw new Error(`Image too large (${(stat.size / 1_000_000).toFixed(1)}MB). Max 1MB.`)
+            }
+
+            const ext = path.extname(imagePath).toLowerCase()
+            const mimeTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' }
+            const mimeType = mimeTypes[ext]
+            if (!mimeType) {
+                throw new Error(`Unsupported image type: ${ext}. Use PNG, JPEG, or WEBP.`)
+            }
+
+            const imageData = fs.readFileSync(imagePath)
+            const blob = new Blob([imageData], { type: mimeType })
+            const formData = new FormData()
+            formData.append('tokenId', String(apiResponse.tokenId))
+            formData.append('image', blob, path.basename(imagePath))
+
+            const uploadRes = await fetch(`${TRENCHES_API_URL}/api/tokens/create/profile`, {
+                method: 'POST',
+                headers: apiHeaders({ 'Cookie': cookies }),
+                body: formData,
+            })
+
+            if (!uploadRes.ok) {
+                const errData = await uploadRes.json().catch(() => ({}))
+                throw new Error(errData.error || errData.message || `Upload failed (${uploadRes.status})`)
+            }
+
+            console.log('   Image uploaded successfully!')
+        } catch (error) {
+            console.log(`   Warning: Image upload failed: ${error.message}`)
+            console.log('   Token will use auto-generated image.')
+        }
+    }
 }
 
 async function handleBuy(args) {
@@ -624,11 +766,27 @@ async function handleBuy(args) {
         const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider)
         tokenSymbol = await tokenContract.symbol()
         tokenDecimals = Number(await tokenContract.decimals())
+
+        // Check anti-bot status via API
+        try {
+            const tokenInfo = await getTokenInfo(tokenSymbol)
+            if (tokenInfo.isAntiBotActive) {
+                console.error(`\nError: Anti-bot protection is active for ${tokenSymbol}.`)
+                console.error('The agent cannot buy during the protection window. Try again later.')
+                process.exit(1)
+            }
+        } catch {}
     } else {
         const tokenInfo = await getTokenInfo(args.token)
         tokenAddress = ethers.getAddress(tokenInfo.address || tokenInfo.tokenAddress)
         tokenSymbol = tokenInfo.symbol || args.token
         tokenDecimals = tokenInfo.decimals || 18
+
+        if (tokenInfo.isAntiBotActive) {
+            console.error(`\nError: Anti-bot protection is active for ${tokenSymbol}.`)
+            console.error('The agent cannot buy during the protection window. Try again later.')
+            process.exit(1)
+        }
     }
 
     console.log(`Token: ${tokenSymbol} (${tokenAddress})`)
